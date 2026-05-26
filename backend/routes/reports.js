@@ -10,7 +10,7 @@ router.get('/ministry', (req, res) => {
   const totalFarms = db.prepare("SELECT COUNT(*) as c FROM farms").get().c;
   const totalListings = db.prepare("SELECT COUNT(*) as c FROM listings WHERE status='active'").get().c;
   const totalOrders = db.prepare("SELECT COUNT(*) as c FROM orders").get().c;
-  const tradeValue = db.prepare("SELECT COALESCE(SUM(total_amount),0) as v FROM orders WHERE payment_status='paid'").get().v;
+  const tradeValue = db.prepare("SELECT COALESCE(SUM(total_amount),0) as v FROM orders WHERE status IN ('confirmed','delivered','completed') OR payment_status='paid'").get().v;
   const totalCerts = db.prepare("SELECT COUNT(*) as c FROM certifications WHERE status='active'").get().c;
   const activeAlerts = db.prepare("SELECT COUNT(*) as c FROM pest_alerts WHERE active=1").get().c;
 
