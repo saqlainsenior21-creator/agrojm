@@ -74,23 +74,26 @@ export default function Register() {
           {/* Farmer-specific: RADA ID + NIN */}
           {form.role === 'farmer' && (
             <div style={{ background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:10, padding:16, marginBottom:14 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:G, marginBottom:12 }}>🏛️ RADA Registration (Optional)</div>
+              <div style={{ fontSize:13, fontWeight:700, color:G, marginBottom:4 }}>🏛️ RADA Farmer ID — Required for Verification</div>
+              <div style={{ fontSize:11, color:'#6b7280', marginBottom:12 }}>
+                Farmers with a RADA ID can instantly self-verify their account. You can still register without one and verify later.
+              </div>
               <div style={{ marginBottom:10 }}>
                 <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>
                   RADA Farmer ID
-                  <span style={{ fontWeight:400, color:'#9ca3af', marginLeft:6 }}>— from your RADA registration card</span>
+                  <span style={{ fontWeight:400, color:'#059669', marginLeft:6 }}>— enter to get instantly verified</span>
                 </label>
-                <input placeholder="e.g. RADA-2024-00123" value={form.rada_id} onChange={set('rada_id')} style={{ ...inp, background:'#fff' }} />
+                <input placeholder="e.g. RADA-2024-SE-00123" value={form.rada_id} onChange={set('rada_id')} style={{ ...inp, background:'#fff' }} />
               </div>
               <div>
                 <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>
                   National Identification Number (NIN)
-                  <span style={{ fontWeight:400, color:'#9ca3af', marginLeft:6 }}>— for identity verification</span>
+                  <span style={{ fontWeight:400, color:'#9ca3af', marginLeft:6 }}>— optional, for identity records</span>
                 </label>
                 <input placeholder="e.g. 1234567890" value={form.national_id} onChange={set('national_id')} style={{ ...inp, background:'#fff' }} />
               </div>
               <p style={{ fontSize:11, color:'#6b7280', margin:'10px 0 0' }}>
-                Your RADA ID enables faster verification and access to government subsidy programs. Protected under Jamaica Data Protection Act 2020.
+                Protected under Jamaica Data Protection Act 2020. RADA ID is on your RADA registration card.
               </p>
             </div>
           )}

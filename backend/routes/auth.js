@@ -55,6 +55,30 @@ router.post('/change-password', auth, (req, res) => {
   res.json({ success: true });
 });
 
+// POST /api/auth/verify-rada — farmer self-verifies using RADA ID
+router.post('/verify-rada', auth, (req, res) => {
+  const { rada_id } = req.body;
+  if (!rada_id || !rada_id.trim().toUpperCase().startsWith('RADA-') || rada_id.trim().length < 8)
+    return res.status(400).json({ error: 'Valid RADA ID required (format: RADA-YYYY-XXXXX)' });
+
+  const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
+  if (user.role !== 'farmer') return res.status(403).json({ error: 'Only farmers can self-verify' });
+  if (user.verification_status === 'verified') return res.status(400).json({ error: 'Already verified' });
+
+  // If farmer registered with a RADA ID, submitted ID must match
+  if (user.rada_id && user.rada_id.toLowerCase() !== rada_id.trim().toLowerCase())
+    return res.status(400).json({ error: 'RADA ID does not match your registered ID. Contact your local extension officer.' });
+
+  const cleanId = rada_id.trim().toUpperCase();
+  db.prepare("UPDATE users SET rada_id=?, verification_status='verified', verified=1 WHERE id=?")
+    .run(cleanId, req.user.id);
+
+  const updated = db.prepare(`SELECT id,name,email,role,phone,parish,business_name,buyer_type,
+    rada_id,national_id,verification_status,verified,extension_parish FROM users WHERE id=?`).get(req.user.id);
+  const token = jwt.sign({ id: updated.id, name: updated.name, email: updated.email, role: updated.role, extension_parish: updated.extension_parish }, SECRET, { expiresIn: '8h' });
+  res.json({ token, user: updated });
+});
+
 // PATCH /api/auth/profile — update own profile (RADA ID, NIN, phone, parish)
 router.patch('/profile', auth, (req, res) => {
   const { phone, parish, rada_id, national_id, business_name } = req.body;

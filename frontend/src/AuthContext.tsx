@@ -1,10 +1,10 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { apiFetch } from './api'
 
-interface User { id: string; name: string; email: string; role: string; parish?: string; business_name?: string; buyer_type?: string }
-interface AuthCtx { user: User | null; login: (email: string, password: string) => Promise<void>; logout: () => void; loading: boolean }
+interface User { id: string; name: string; email: string; role: string; parish?: string; business_name?: string; buyer_type?: string; rada_id?: string; verification_status?: string }
+interface AuthCtx { user: User | null; login: (email: string, password: string) => Promise<void>; logout: () => void; loading: boolean; refreshUser: () => Promise<void> }
 
-const Ctx = createContext<AuthCtx>({ user: null, login: async () => {}, logout: () => {}, loading: true });
+const Ctx = createContext<AuthCtx>({ user: null, login: async () => {}, logout: () => {}, loading: true, refreshUser: async () => {} });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -25,7 +25,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => { localStorage.removeItem('agrojm_token'); setUser(null); };
 
-  return <Ctx.Provider value={{ user, login, logout, loading }}>{children}</Ctx.Provider>;
+  const refreshUser = async () => {
+    const u = await apiFetch('/auth/me');
+    setUser(u);
+  };
+
+  return <Ctx.Provider value={{ user, login, logout, loading, refreshUser }}>{children}</Ctx.Provider>;
 }
 
 export const useAuth = () => useContext(Ctx);

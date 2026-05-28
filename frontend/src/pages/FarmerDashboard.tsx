@@ -6,7 +6,7 @@ import { useAuth } from '../AuthContext'
 const G = '#2d6a4f'
 
 export default function FarmerDashboard() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const navigate = useNavigate()
   const [tab, setTab] = useState<'listings'|'orders'|'crops'|'certifications'|'new_listing'>('listings')
   const [listings, setListings] = useState<any[]>([])
@@ -21,6 +21,9 @@ export default function FarmerDashboard() {
   const [certForm, setCertForm] = useState({ cert_type:'GAP', cert_number:'', issued_by:'', issued_date:'', expiry_date:'', notes:'' })
   const [updatingId, setUpdatingId] = useState<string|null>(null)
   const [updateForm, setUpdateForm] = useState({ stage:'growing', actual_harvest:'', quantity_harvested:'', notes:'' })
+  const [radaInput, setRadaInput] = useState((user as any)?.rada_id || '')
+  const [radaLoading, setRadaLoading] = useState(false)
+  const [radaError, setRadaError] = useState('')
 
   useEffect(() => {
     Promise.all([
@@ -64,6 +67,16 @@ export default function FarmerDashboard() {
     } catch(e:any) { alert(e.message) }
   }
 
+  async function verifyWithRada() {
+    setRadaLoading(true); setRadaError('')
+    try {
+      const data = await apiFetch('/auth/verify-rada', { method:'POST', body: JSON.stringify({ rada_id: radaInput }) })
+      localStorage.setItem('agrojm_token', data.token)
+      await refreshUser()
+    } catch(e:any) { setRadaError(e.message) }
+    finally { setRadaLoading(false) }
+  }
+
   async function addCert() {
     try {
       await apiFetch('/certifications', { method:'POST', body: JSON.stringify(certForm) })
@@ -86,19 +99,39 @@ export default function FarmerDashboard() {
 
   return (
     <div style={{ padding:32 }}>
-      {/* Verification banner */}
+      {/* Verification banner — self-verify with RADA ID */}
       {verStatus !== 'verified' && (
-        <div style={{ background: verStatus==='rejected' ? '#fef2f2' : '#fffbeb', border:`1px solid ${verStatus==='rejected'?'#fca5a5':'#fde68a'}`, borderRadius:10, padding:'12px 18px', marginBottom:20, display:'flex', alignItems:'center', gap:12 }}>
-          <span style={{ fontSize:20 }}>{verStatus==='rejected' ? '❌' : '⏳'}</span>
-          <div>
-            <div style={{ fontSize:14, fontWeight:700, color: verStatus==='rejected'?'#991b1b':'#854d0e' }}>
-              {verStatus==='rejected' ? 'Verification Rejected' : 'Pending RADA Verification'}
+        <div style={{ background: verStatus==='rejected' ? '#fef2f2' : '#fffbeb', border:`1px solid ${verStatus==='rejected'?'#fca5a5':'#fde68a'}`, borderRadius:12, padding:'18px 20px', marginBottom:20 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+            <span style={{ fontSize:22 }}>{verStatus==='rejected' ? '❌' : '🏛️'}</span>
+            <div>
+              <div style={{ fontSize:14, fontWeight:700, color: verStatus==='rejected'?'#991b1b':'#854d0e' }}>
+                {verStatus==='rejected' ? 'Verification Rejected' : 'Verify Your RADA ID'}
+              </div>
+              <div style={{ fontSize:12, color:'#6b7280' }}>
+                {verStatus==='rejected'
+                  ? 'Enter your correct RADA ID below to re-verify, or contact your local extension officer.'
+                  : 'Enter your RADA Farmer ID to instantly verify your account and unlock all features.'}
+              </div>
             </div>
-            <div style={{ fontSize:13, color:'#6b7280' }}>
-              {verStatus==='rejected'
-                ? 'Your account was not verified. Contact your local extension officer or update your RADA ID.'
-                : 'An extension officer will verify your RADA ID. You can still list produce while pending.'}
-            </div>
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <input
+              placeholder="e.g. RADA-2024-SE-00123"
+              value={radaInput}
+              onChange={e => { setRadaInput(e.target.value.toUpperCase()); setRadaError('') }}
+              style={{ flex:1, minWidth:200, padding:'9px 12px', border:`1.5px solid ${radaError?'#fca5a5':'#d1d5db'}`, borderRadius:8, fontSize:13, boxSizing:'border-box' as const }}
+            />
+            <button
+              onClick={verifyWithRada}
+              disabled={radaLoading || !radaInput.trim()}
+              style={{ padding:'9px 20px', background:G, color:'#fff', border:'none', borderRadius:8, fontWeight:600, cursor:'pointer', fontSize:13, opacity:radaLoading||!radaInput.trim()?0.6:1, whiteSpace:'nowrap' }}>
+              {radaLoading ? 'Verifying...' : '✅ Verify Now'}
+            </button>
+          </div>
+          {radaError && <div style={{ fontSize:12, color:'#dc2626', marginTop:8 }}>⚠️ {radaError}</div>}
+          <div style={{ fontSize:11, color:'#9ca3af', marginTop:8 }}>
+            Your RADA ID is on your RADA registration card. Format: RADA-YYYY-XX-NNNNN
           </div>
         </div>
       )}
