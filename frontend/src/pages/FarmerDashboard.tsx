@@ -17,8 +17,10 @@ export default function FarmerDashboard() {
   const [farms, setFarms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ crop_type_id:'', title:'', description:'', quantity_available:'', unit:'lb', price_per_unit:'', parish: (user as any)?.parish||'', harvest_date:'' })
-  const [cropForm, setCropForm] = useState({ crop_type_id:'', stage:'planted', planting_date:'', expected_harvest:'', quantity_planted:'', notes:'' })
+  const [cropForm, setCropForm] = useState({ crop_type_id:'', farm_id:'', stage:'planted', planting_date:'', expected_harvest:'', quantity_planted:'', unit:'lb', notes:'' })
   const [certForm, setCertForm] = useState({ cert_type:'GAP', cert_number:'', issued_by:'', issued_date:'', expiry_date:'', notes:'' })
+  const [updatingId, setUpdatingId] = useState<string|null>(null)
+  const [updateForm, setUpdateForm] = useState({ stage:'growing', actual_harvest:'', quantity_harvested:'', notes:'' })
 
   useEffect(() => {
     Promise.all([
@@ -45,7 +47,20 @@ export default function FarmerDashboard() {
   async function logCrop() {
     try {
       await apiFetch('/crops/logs', { method:'POST', body: JSON.stringify({...cropForm, quantity_planted: Number(cropForm.quantity_planted)}) })
-      alert('✅ Crop logged!'); apiFetch('/crops/logs').then(setCrops)
+      alert('✅ Crop logged!')
+      setCropForm({ crop_type_id:'', farm_id:'', stage:'planted', planting_date:'', expected_harvest:'', quantity_planted:'', unit:'lb', notes:'' })
+      apiFetch('/crops/logs').then(setCrops)
+    } catch(e:any) { alert(e.message) }
+  }
+
+  async function updateCrop(id: string) {
+    try {
+      await apiFetch(`/crops/logs/${id}`, { method:'PATCH', body: JSON.stringify({
+        ...updateForm,
+        quantity_harvested: updateForm.quantity_harvested ? Number(updateForm.quantity_harvested) : undefined
+      })})
+      setUpdatingId(null)
+      apiFetch('/crops/logs').then(setCrops)
     } catch(e:any) { alert(e.message) }
   }
 
@@ -175,38 +190,137 @@ export default function FarmerDashboard() {
       {/* Crop Tracker */}
       {tab === 'crops' && (
         <div>
+          {/* Yield summary stats */}
+          {(() => {
+            const STAGES = ['planted','growing','flowering','harvesting','harvested']
+            const harvested = crops.filter((c:any) => c.stage === 'harvested')
+            const totalYield = harvested.reduce((s:number, c:any) => s + (c.quantity_harvested||0), 0)
+            return (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:12, marginBottom:20 }}>
+                {[
+                  { icon:'🌾', label:'Total Logged', val: crops.length, color:G },
+                  { icon:'⏳', label:'In Progress', val: crops.filter((c:any) => c.stage !== 'harvested').length, color:'#b45309' },
+                  { icon:'✅', label:'Harvested', val: harvested.length, color:'#065f46' },
+                  { icon:'📦', label:'Total Yield', val: `${totalYield.toFixed(0)} lb`, color:'#1d4ed8' },
+                ].map(s => (
+                  <div key={s.label} style={{ background:'#fff', borderRadius:10, padding:16, textAlign:'center', border:'1px solid #e5e7eb' }}>
+                    <div style={{ fontSize:22 }}>{s.icon}</div>
+                    <div style={{ fontSize:22, fontWeight:800, color:s.color }}>{s.val}</div>
+                    <div style={{ fontSize:12, color:'#6b7280' }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* Log New Crop form */}
           <div style={{ background:'#fff', borderRadius:12, padding:24, border:'1px solid #e5e7eb', marginBottom:20 }}>
-            <h3 style={{ fontSize:16, fontWeight:700, marginBottom:16 }}>Log New Crop</h3>
+            <h3 style={{ fontSize:16, fontWeight:700, marginBottom:16 }}>🌱 Log New Crop</h3>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               <select value={cropForm.crop_type_id} onChange={set(setCropForm,'crop_type_id')} style={inp}>
                 <option value=''>Select crop...</option>
-                {cropTypes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {cropTypes.map((c:any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <select value={cropForm.farm_id} onChange={set(setCropForm,'farm_id')} style={inp}>
+                <option value=''>Select farm (optional)...</option>
+                {farms.map((f:any) => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
               <select value={cropForm.stage} onChange={set(setCropForm,'stage')} style={inp}>
-                {['planted','growing','flowering','harvesting','harvested'].map(s => <option key={s} value={s}>{s}</option>)}
+                {['planted','growing','flowering','harvesting','harvested'].map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+              </select>
+              <select value={cropForm.unit} onChange={set(setCropForm,'unit')} style={inp}>
+                {['lb','kg','bunch','bag','box','crate'].map(u => <option key={u} value={u}>{u}</option>)}
               </select>
               <input type="date" placeholder="Planting date" value={cropForm.planting_date} onChange={set(setCropForm,'planting_date')} style={inp} />
               <input type="date" placeholder="Expected harvest" value={cropForm.expected_harvest} onChange={set(setCropForm,'expected_harvest')} style={inp} />
-              <input type="number" placeholder="Quantity planted (lb)" value={cropForm.quantity_planted} onChange={set(setCropForm,'quantity_planted')} style={inp} />
-              <input placeholder="Notes" value={cropForm.notes} onChange={set(setCropForm,'notes')} style={inp} />
+              <input type="number" placeholder="Quantity planted" value={cropForm.quantity_planted} onChange={set(setCropForm,'quantity_planted')} style={inp} />
+              <input placeholder="Notes (optional)" value={cropForm.notes} onChange={set(setCropForm,'notes')} style={inp} />
             </div>
             <button onClick={logCrop} style={{ marginTop:12, padding:'10px 24px', background:G, color:'#fff', border:'none', borderRadius:8, fontWeight:600, cursor:'pointer' }}>Log Crop</button>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:14 }}>
-            {crops.map((c:any) => (
-              <div key={c.id} style={{ background:'#fff', borderRadius:12, padding:18, border:'1px solid #e5e7eb' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                  <span style={{ fontWeight:700 }}>{c.crop_name}</span>
-                  <span style={{ fontSize:12, background:'#f0fdf4', color:G, padding:'2px 10px', borderRadius:20 }}>{c.stage}</span>
-                </div>
-                {c.farm_name && <div style={{ fontSize:12, color:'#9ca3af', marginBottom:6 }}>Farm: {c.farm_name}</div>}
-                {c.planting_date && <div style={{ fontSize:13, color:'#6b7280' }}>🌱 Planted: {c.planting_date}</div>}
-                {c.expected_harvest && <div style={{ fontSize:13, color:'#6b7280' }}>🌾 Expected: {c.expected_harvest}</div>}
-                {c.quantity_planted && <div style={{ fontSize:13, color:G, fontWeight:600 }}>{c.quantity_planted} {c.unit}</div>}
+
+          {/* Crop cards */}
+          {crops.length === 0
+            ? <p style={{ color:'#9ca3af', fontSize:13 }}>No crops logged yet. Start tracking above!</p>
+            : <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))', gap:14 }}>
+                {crops.map((c:any) => {
+                  const STAGES = ['planted','growing','flowering','harvesting','harvested']
+                  const stageColors: Record<string,string> = { planted:'#fef3c7', growing:'#d1fae5', flowering:'#ede9fe', harvesting:'#ffedd5', harvested:'#dcfce7' }
+                  const stageText: Record<string,string>  = { planted:'#92400e', growing:'#065f46', flowering:'#5b21b6', harvesting:'#c2410c', harvested:'#15803d' }
+                  const idx = STAGES.indexOf(c.stage)
+                  const isUpdating = updatingId === c.id
+                  return (
+                    <div key={c.id} style={{ background:'#fff', borderRadius:12, padding:18, border:'1px solid #e5e7eb' }}>
+                      {/* Header */}
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+                        <div>
+                          <div style={{ fontWeight:700, fontSize:15 }}>{c.crop_name}</div>
+                          {c.farm_name && <div style={{ fontSize:11, color:'#9ca3af' }}>{c.farm_name}</div>}
+                        </div>
+                        <span style={{ fontSize:11, fontWeight:600, background:stageColors[c.stage]||'#f3f4f6', color:stageText[c.stage]||'#374151', padding:'3px 10px', borderRadius:20, whiteSpace:'nowrap' }}>
+                          {c.stage.charAt(0).toUpperCase()+c.stage.slice(1)}
+                        </span>
+                      </div>
+
+                      {/* Stage pipeline */}
+                      <div style={{ display:'flex', alignItems:'center', marginBottom:12 }}>
+                        {STAGES.map((s, i) => (
+                          <div key={s} style={{ display:'flex', alignItems:'center', flex: i < STAGES.length-1 ? 1 : 'none' }}>
+                            <div title={s} style={{ width:10, height:10, borderRadius:'50%', background: i<=idx ? G : '#e5e7eb', flexShrink:0 }} />
+                            {i < STAGES.length-1 && <div style={{ flex:1, height:2, background: i<idx ? G : '#e5e7eb' }} />}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Details */}
+                      <div style={{ fontSize:12, color:'#6b7280', display:'flex', flexDirection:'column', gap:4, marginBottom:12 }}>
+                        {c.planting_date && <span>🌱 Planted: {c.planting_date}</span>}
+                        {c.expected_harvest && <span>📅 Expected harvest: {c.expected_harvest}</span>}
+                        {c.quantity_planted ? <span>⚖️ Qty planted: {c.quantity_planted} {c.unit}</span> : null}
+                        {c.quantity_harvested ? (
+                          <span style={{ color:G, fontWeight:700 }}>
+                            📦 Harvested: {c.quantity_harvested} {c.unit}
+                            {c.quantity_planted ? <span style={{ color:'#6b7280', fontWeight:400 }}> ({Math.round(c.quantity_harvested/c.quantity_planted*100)}% yield)</span> : null}
+                          </span>
+                        ) : null}
+                        {c.actual_harvest && <span>✅ Actual harvest date: {c.actual_harvest}</span>}
+                        {c.notes && <span style={{ fontStyle:'italic' }}>💬 {c.notes}</span>}
+                      </div>
+
+                      {/* Update toggle button */}
+                      {!isUpdating && c.stage !== 'harvested' && (
+                        <button
+                          onClick={() => { setUpdatingId(c.id); setUpdateForm({ stage: STAGES[Math.min(idx+1,4)], actual_harvest:'', quantity_harvested:'', notes:'' }) }}
+                          style={{ width:'100%', padding:'7px', background:'#f9fafb', color:'#374151', border:'1.5px solid #e5e7eb', borderRadius:7, cursor:'pointer', fontSize:12, fontWeight:600 }}>
+                          Update Stage →
+                        </button>
+                      )}
+                      {!isUpdating && c.stage === 'harvested' && (
+                        <div style={{ fontSize:11, color:G, textAlign:'center', fontWeight:600, paddingTop:2 }}>✅ Complete</div>
+                      )}
+
+                      {/* Inline update form */}
+                      {isUpdating && (
+                        <div style={{ borderTop:'1px solid #f3f4f6', paddingTop:12, marginTop:4, display:'grid', gap:8 }}>
+                          <select value={updateForm.stage} onChange={e => setUpdateForm(f => ({...f, stage:e.target.value}))} style={{ ...inp, fontSize:13 }}>
+                            {STAGES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+                          </select>
+                          {(updateForm.stage === 'harvesting' || updateForm.stage === 'harvested') && (<>
+                            <input type="date" placeholder="Actual harvest date" value={updateForm.actual_harvest} onChange={e => setUpdateForm(f => ({...f, actual_harvest:e.target.value}))} style={{ ...inp, fontSize:13 }} />
+                            <input type="number" placeholder={`Qty harvested (${c.unit})`} value={updateForm.quantity_harvested} onChange={e => setUpdateForm(f => ({...f, quantity_harvested:e.target.value}))} style={{ ...inp, fontSize:13 }} />
+                          </>)}
+                          <input placeholder="Notes (optional)" value={updateForm.notes} onChange={e => setUpdateForm(f => ({...f, notes:e.target.value}))} style={{ ...inp, fontSize:13 }} />
+                          <div style={{ display:'flex', gap:8 }}>
+                            <button onClick={() => updateCrop(c.id)} style={{ flex:1, padding:'7px', background:G, color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:12, fontWeight:600 }}>Save</button>
+                            <button onClick={() => setUpdatingId(null)} style={{ flex:1, padding:'7px', background:'#fff', color:'#6b7280', border:'1.5px solid #e5e7eb', borderRadius:7, cursor:'pointer', fontSize:12 }}>Cancel</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-            ))}
-            {crops.length === 0 && <p style={{ color:'#9ca3af', fontSize:13 }}>No crops logged yet. Start tracking your crops above!</p>}
-          </div>
+          }
         </div>
       )}
 
